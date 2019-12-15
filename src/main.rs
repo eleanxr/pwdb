@@ -1,5 +1,5 @@
 use base64;
-
+use openssl::sha::sha256;
 use openssl::symm::{Cipher, Crypter, Mode};
 
 // TODO: Generate
@@ -16,7 +16,13 @@ fn main() {
     let plaintexts: [&[u8]; 2] = [b"data1", b"data2"];
     let data_len = plaintexts.iter().fold(0, |sum, x| sum + x.len());
 
-    let mut encrypter = Crypter::new(Cipher::aes_128_cbc(), Mode::Encrypt, &key(), Some(&initialization_vector())).unwrap();
+    let mut encrypter = Crypter::new(
+        Cipher::aes_128_cbc(),
+        Mode::Encrypt,
+        &key(),
+        Some(&initialization_vector()),
+    )
+    .unwrap();
 
     let blocksize = Cipher::aes_128_cbc().block_size();
     let mut ciphertext = vec![0; data_len + blocksize];
@@ -33,12 +39,27 @@ fn main() {
     let ciphertext_len = decoded_ciphertext.len();
     let ciphertexts = [&decoded_ciphertext[..9], &decoded_ciphertext[9..]];
 
-    let mut decrypter = Crypter::new(Cipher::aes_128_cbc(), Mode::Decrypt, &key(), Some(&initialization_vector())).unwrap();
+    let mut decrypter = Crypter::new(
+        Cipher::aes_128_cbc(),
+        Mode::Decrypt,
+        &key(),
+        Some(&initialization_vector()),
+    )
+    .unwrap();
 
     let mut plaintext = vec![0; ciphertext_len + blocksize];
     let mut count = decrypter.update(ciphertexts[0], &mut plaintext).unwrap();
-    count += decrypter.update(ciphertexts[1], &mut plaintext[count..]).unwrap();
+    count += decrypter
+        .update(ciphertexts[1], &mut plaintext[count..])
+        .unwrap();
     count += decrypter.finalize(&mut plaintext[count..]).unwrap();
     plaintext.truncate(count);
-    println!("Decrypted: {}", std::str::from_utf8(&plaintext[..]).unwrap());
+    println!(
+        "Decrypted: {}",
+        std::str::from_utf8(&plaintext[..]).unwrap()
+    );
+
+    let message_key = b"fakesite.com";
+    let hash = sha256(message_key);
+    println!("Hashed key: {}", hex::encode(hash));
 }
