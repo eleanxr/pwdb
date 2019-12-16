@@ -2,6 +2,9 @@ use base64;
 use openssl::sha::sha256;
 use openssl::symm::{Cipher, Crypter, Mode};
 
+mod crypto;
+mod store;
+
 // TODO: Generate
 fn initialization_vector() -> [u8; 16] {
     *b"\x00\x01\x02\x03\x04\x05\x06\x07\x00\x01\x02\x03\x04\x05\x06\x07"
@@ -59,7 +62,23 @@ fn main() {
         std::str::from_utf8(&plaintext[..]).unwrap()
     );
 
-    let message_key = b"fakesite.com";
-    let hash = sha256(message_key);
-    println!("Hashed key: {}", hex::encode(hash));
+    println!("Begin");
+
+    let mut data_store = store::MapStore::new();
+
+    data_store.add("somesite.com", "somepassword");
+    data_store.add("anothersite.com", "anotherpassword");
+
+    println!(
+        "anothersite.com: {}",
+        data_store
+            .find("anothersite.com")
+            .expect("Failed to find site")
+    );
+    println!(
+        "somesite.com: {}",
+        data_store
+            .find("somesite.com")
+            .expect("Failed to find site")
+    );
 }
