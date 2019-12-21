@@ -1,6 +1,11 @@
 use openssl::sha::sha256;
 use openssl::symm::{Cipher, Crypter, Mode};
 
+// TODO: Generate
+pub fn initialization_vector() -> [u8; 16] {
+    *b"\x00\x01\x02\x03\x04\x05\x06\x07\x00\x01\x02\x03\x04\x05\x06\x07"
+}
+
 pub fn hash_string(s: &str) -> [u8; 32] {
     sha256(s.as_bytes())
 }
