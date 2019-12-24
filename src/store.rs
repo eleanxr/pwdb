@@ -2,29 +2,31 @@ use std::collections::BTreeMap;
 
 use crate::crypto;
 
-type SymmetricKey = [u8; 16];
+use serde::{Deserialize, Serialize};
+
+pub type SymmetricKey = [u8; 16];
 type InitializationVector = [u8; 16];
 type Hash = [u8; 32];
 
 pub trait DataStore<K, V> {
-    fn add(&mut self, key: &K, value: &V);
-    fn find(&self, key: &K) -> Result<String, String>;
+    fn add(&mut self, symmetric_key: SymmetricKey, key: &K, value: &V);
+    fn find(&self, symmetric_key: SymmetricKey, key: &K) -> Result<String, String>;
 }
 
+#[derive(Serialize, Deserialize)]
 struct DataBlock {
     initialization_vector: InitializationVector,
     data: Vec<u8>,
 }
 
+#[derive(Serialize, Deserialize)]
 pub struct MapStore {
-    symmetric_key: SymmetricKey,
-    map: BTreeMap<Hash, DataBlock>,
+    map: BTreeMap<String, DataBlock>,
 }
 
 impl MapStore {
-    pub fn create(symmetric_key: SymmetricKey) -> MapStore {
+    pub fn create() -> MapStore {
         MapStore {
-            symmetric_key: symmetric_key,
             map: BTreeMap::new(),
         }
     }
@@ -56,26 +58,27 @@ impl Cryptable for String {
 }
 
 impl<K: Hashable, V: Cryptable> DataStore<K, V> for MapStore {
-    fn add(&mut self, key: &K, value: &V) {
+    fn add(&mut self, symmetric_key: SymmetricKey, key: &K, value: &V) {
         let iv = crypto::initialization_vector();
         self.map.insert(
-            key.hash(),
+            hex::encode(key.hash()),
             DataBlock {
                 initialization_vector: iv,
-                data: value.encrypt(self.symmetric_key, iv),
+                data: value.encrypt(symmetric_key, iv),
             },
         );
     }
 
-    fn find(&self, key: &K) -> Result<String, String> {
-        let result = self.map
-            .get(&key.hash())
+    fn find(&self, symmetric_key: SymmetricKey, key: &K) -> Result<String, String> {
+        let result = self
+            .map
+            .get(&hex::encode(key.hash()))
             .map(|block: &DataBlock| {
-                Cryptable::decrypt(self.symmetric_key, block.initialization_vector, &block.data)
+                Cryptable::decrypt(symmetric_key, block.initialization_vector, &block.data)
             });
         match result {
             Some(value) => Ok(value),
-            None => Err(String::from("Failed to decrypt."))
+            None => Err(String::from("Failed to decrypt.")),
         }
     }
 }

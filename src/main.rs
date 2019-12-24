@@ -1,37 +1,24 @@
-
+mod console;
 mod crypto;
-mod json_store;
 mod store;
 
-// TODO Derive
-fn key() -> [u8; 16] {
-    *b"\x00\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0A\x0B\x0C\x0D\x0E\x0F"
+use std::env;
+
+fn add_entry<T: store::DataStore<String, String>>(data_store: &mut T, site: &String) {
+    let symmetric_key = crypto::derive_key(&String::from("csdfhangeme!"));
+    data_store.add(symmetric_key.unwrap(), &site, &String::from("testpassword"));
 }
 
-fn test<T: store::DataStore<String, String>>(data_store: &mut T) {
-    let key1: String = String::from("somesite.com");
-    let value1: String = String::from("somepassword");
-    let key2: String = String::from("anothersite.com");
-    let value2: String = String::from("anotherpassword");
-
-    data_store.add(&key1, &value1);
-    data_store.add(&key2, &value2);
-
-    println!(
-        "anothersite.com: {}",
-        data_store
-            .find(&key1)
-            .expect("Failed to find site")
-    );
-    println!(
-        "somesite.com: {}",
-        data_store
-            .find(&key2)
-            .expect("Failed to find site")
-    );
+fn get_entry<T: store::DataStore<String, String>>(data_store: &T, site: &String) {
 }
 
 fn main() {
-    let mut data_store: store::MapStore = store::MapStore::create(key());
-    test(&mut data_store);
+    let mut data_store: store::MapStore = store::MapStore::create();
+    let command = console::parse_command_line(&env::args().collect()).expect("Invalid invocation");
+    match command.operation {
+        console::Operation::Add => add_entry(&mut data_store, &command.site),
+        console::Operation::Get => get_entry(&data_store, &command.site),
+    }
+    let json = serde_json::to_string(&data_store).unwrap();
+    println!("data: {}", json);
 }

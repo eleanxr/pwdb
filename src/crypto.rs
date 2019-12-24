@@ -1,5 +1,6 @@
 use openssl::sha::sha256;
 use openssl::symm::{Cipher, Crypter, Mode};
+use openssl::pkcs5;
 
 // TODO: Generate
 pub fn initialization_vector() -> [u8; 16] {
@@ -30,4 +31,38 @@ pub fn encrypt_string(key: [u8; 16], iv: [u8; 16], s: &str) -> Result<Vec<u8>, S
 pub fn decrypt_string(key: [u8; 16], iv: [u8; 16], data: &Vec<u8>) -> Result<String, String> {
     String::from_utf8(run_crypter(key, iv, Mode::Decrypt, &data).unwrap())
         .map_err(|err| err.to_string())
+}
+
+pub fn derive_key(password: &String) -> Result<[u8; 16], String> {
+    let mut key: [u8; 16] = [0; 16];
+    let result = pkcs5::scrypt(
+        password.as_bytes(),
+        password.as_bytes(),
+        16384,
+        8,
+        1,
+        0,
+        &mut key,
+    );
+    match result {
+        Err(stack) => Err(stack.to_string()),
+        _ => Ok(key)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    pub fn test_encrypt_string() {
+        let key1 = derive_key(&String::from("pw1"));
+        let key2 = derive_key(&String::from("pw2"));
+        let plaintext = String::from("some plaintext goes here");
+
+        let c1 = encrypt_string(key1.unwrap(), initialization_vector(), &plaintext).unwrap();
+        let c2 = encrypt_string(key2.unwrap(), initialization_vector(), &plaintext).unwrap();
+        println!("c1: {}", base64::encode(&c1));
+        println!("c2: {}", base64::encode(&c2));
+        assert!(c1 != c2);
+    }
 }
