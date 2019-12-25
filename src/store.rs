@@ -5,18 +5,20 @@ use crate::crypto;
 use serde::{Deserialize, Serialize};
 
 pub type SymmetricKey = [u8; 16];
-type InitializationVector = [u8; 16];
+pub type InitializationVector = [u8; 16];
+pub type Salt = [u8; 16];
 type Hash = [u8; 32];
+
+#[derive(Serialize, Deserialize)]
+struct DataBlock {
+    salt: Salt,
+    initialization_vector: InitializationVector,
+    data: Vec<u8>,
+}
 
 pub trait DataStore<K, V> {
     fn add(&mut self, symmetric_key: SymmetricKey, key: &K, value: &V);
     fn find(&self, symmetric_key: SymmetricKey, key: &K) -> Result<String, String>;
-}
-
-#[derive(Serialize, Deserialize)]
-struct DataBlock {
-    initialization_vector: InitializationVector,
-    data: Vec<u8>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -60,9 +62,12 @@ impl Cryptable for String {
 impl<K: Hashable, V: Cryptable> DataStore<K, V> for MapStore {
     fn add(&mut self, symmetric_key: SymmetricKey, key: &K, value: &V) {
         let iv = crypto::initialization_vector();
+        let mut salt: Salt = [0; 16];
+        openssl::rand::rand_bytes(&mut salt).expect("Failed to generate salt.");
         self.map.insert(
             hex::encode(key.hash()),
             DataBlock {
+                salt: salt,
                 initialization_vector: iv,
                 data: value.encrypt(symmetric_key, iv),
             },

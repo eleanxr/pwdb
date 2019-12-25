@@ -1,6 +1,6 @@
+use openssl::pkcs5;
 use openssl::sha::sha256;
 use openssl::symm::{Cipher, Crypter, Mode};
-use openssl::pkcs5;
 
 // TODO: Generate
 pub fn initialization_vector() -> [u8; 16] {
@@ -13,8 +13,7 @@ pub fn hash_string(s: &str) -> [u8; 32] {
 
 fn run_crypter(key: [u8; 16], iv: [u8; 16], mode: Mode, data: &Vec<u8>) -> Result<Vec<u8>, String> {
     let length = data.len();
-    let mut encrypter =
-        Crypter::new(Cipher::aes_128_cbc(), mode, &key, Some(&iv)).unwrap();
+    let mut encrypter = Crypter::new(Cipher::aes_128_cbc(), mode, &key, Some(&iv)).unwrap();
     let block_size = Cipher::aes_128_cbc().block_size();
 
     let mut output = vec![0; length + block_size];
@@ -33,20 +32,12 @@ pub fn decrypt_string(key: [u8; 16], iv: [u8; 16], data: &Vec<u8>) -> Result<Str
         .map_err(|err| err.to_string())
 }
 
-pub fn derive_key(password: &String) -> Result<[u8; 16], String> {
+pub fn derive_key(password: &String, salt: &[u8; 16]) -> Result<[u8; 16], String> {
     let mut key: [u8; 16] = [0; 16];
-    let result = pkcs5::scrypt(
-        password.as_bytes(),
-        password.as_bytes(),
-        16384,
-        8,
-        1,
-        0,
-        &mut key,
-    );
+    let result = pkcs5::scrypt(password.as_bytes(), salt, 16384, 8, 1, 0, &mut key);
     match result {
         Err(stack) => Err(stack.to_string()),
-        _ => Ok(key)
+        _ => Ok(key),
     }
 }
 
@@ -55,8 +46,11 @@ mod tests {
     use super::*;
     #[test]
     pub fn test_encrypt_string() {
-        let key1 = derive_key(&String::from("pw1"));
-        let key2 = derive_key(&String::from("pw2"));
+        let salt: [u8; 16] = [
+            0x0, 0x1, 0x2, 0x3, 0x4, 0x5, 0x6, 0x7, 0x8, 0x9, 0xa, 0xb, 0xc, 0xd, 0xe, 0xf,
+        ];
+        let key1 = derive_key(&String::from("pw1"), &salt);
+        let key2 = derive_key(&String::from("pw2"), &salt);
         let plaintext = String::from("some plaintext goes here");
 
         let c1 = encrypt_string(key1.unwrap(), initialization_vector(), &plaintext).unwrap();
