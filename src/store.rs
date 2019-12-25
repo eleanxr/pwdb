@@ -16,7 +16,7 @@ struct DataBlock {
 
 pub trait DataStore<K, V> {
     fn add(&mut self, passphrase: &String, key: &K, value: &V);
-    fn find(&self, passphrase: &String, key: &K) -> Result<String, String>;
+    fn find(&self, passphrase: &String, key: &K) -> Result<V, String>;
 }
 
 #[derive(Serialize, Deserialize)]
@@ -72,7 +72,7 @@ impl<K: Hashable, V: Cryptable> DataStore<K, V> for MapStore {
         );
     }
 
-    fn find(&self, passphrase: &String, key: &K) -> Result<String, String> {
+    fn find(&self, passphrase: &String, key: &K) -> Result<V, String> {
         let result = self
             .map
             .get(&hex::encode(key.hash()))
@@ -86,5 +86,25 @@ impl<K: Hashable, V: Cryptable> DataStore<K, V> for MapStore {
             Some(value) => Ok(value),
             None => Err(String::from("Failed to decrypt.")),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_roundtrip() {
+        let mut data_store: MapStore = MapStore::create();
+        data_store.add(
+            &"encryption_password".to_string(),
+            &"key1".to_string(),
+            &"value1".to_string(),
+        );
+
+        let result: String = data_store
+            .find(&"encryption_password".to_string(), &"key1".to_string())
+            .unwrap();
+        assert_eq!("value1".to_string(), result);
     }
 }
