@@ -5,10 +5,7 @@ mod store;
 use std::env;
 
 fn add_entry<T: store::DataStore<String, String>>(data_store: &mut T, site: &String) {
-    let mut salt: [u8; 16] = [0; 16];
-    openssl::rand::rand_bytes(&mut salt).expect("Failed to generate salt.");
-    let symmetric_key = crypto::derive_key(&String::from("csdfhangeme!"), &salt);
-    data_store.add(symmetric_key.unwrap(), &site, &String::from("testpassword"));
+    data_store.add(&String::from("fakepassword"), &site, &String::from("testpassword"));
 }
 
 fn get_entry<T: store::DataStore<String, String>>(data_store: &T, site: &String) {

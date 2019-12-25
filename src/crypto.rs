@@ -1,17 +1,35 @@
 use openssl::pkcs5;
+use openssl::rand;
 use openssl::sha::sha256;
 use openssl::symm::{Cipher, Crypter, Mode};
 
-// TODO: Generate
-pub fn initialization_vector() -> [u8; 16] {
-    *b"\x00\x01\x02\x03\x04\x05\x06\x07\x00\x01\x02\x03\x04\x05\x06\x07"
+pub type SymmetricKey = [u8; 16];
+pub type InitializationVector = [u8; 16];
+pub type Salt = [u8; 16];
+pub type Block = [u8; 16];
+
+pub fn initialization_vector() -> InitializationVector {
+    let mut result: InitializationVector = [0; 16];
+    rand::rand_bytes(&mut result).expect("Failed to generate initialization vector.");
+    result
+}
+
+pub fn salt() -> Salt {
+    let mut result: Salt = [0; 16];
+    rand::rand_bytes(&mut result).expect("Failed to generate salt.");
+    result
 }
 
 pub fn hash_string(s: &str) -> [u8; 32] {
     sha256(s.as_bytes())
 }
 
-fn run_crypter(key: [u8; 16], iv: [u8; 16], mode: Mode, data: &Vec<u8>) -> Result<Vec<u8>, String> {
+fn run_crypter(
+    key: SymmetricKey,
+    iv: InitializationVector,
+    mode: Mode,
+    data: &Vec<u8>,
+) -> Result<Vec<u8>, String> {
     let length = data.len();
     let mut encrypter = Crypter::new(Cipher::aes_128_cbc(), mode, &key, Some(&iv)).unwrap();
     let block_size = Cipher::aes_128_cbc().block_size();
@@ -23,16 +41,24 @@ fn run_crypter(key: [u8; 16], iv: [u8; 16], mode: Mode, data: &Vec<u8>) -> Resul
     Ok(output)
 }
 
-pub fn encrypt_string(key: [u8; 16], iv: [u8; 16], s: &str) -> Result<Vec<u8>, String> {
+pub fn encrypt_string(
+    key: SymmetricKey,
+    iv: InitializationVector,
+    s: &str,
+) -> Result<Vec<u8>, String> {
     run_crypter(key, iv, Mode::Encrypt, &s.as_bytes().to_vec())
 }
 
-pub fn decrypt_string(key: [u8; 16], iv: [u8; 16], data: &Vec<u8>) -> Result<String, String> {
+pub fn decrypt_string(
+    key: SymmetricKey,
+    iv: InitializationVector,
+    data: &Vec<u8>,
+) -> Result<String, String> {
     String::from_utf8(run_crypter(key, iv, Mode::Decrypt, &data).unwrap())
         .map_err(|err| err.to_string())
 }
 
-pub fn derive_key(password: &String, salt: &[u8; 16]) -> Result<[u8; 16], String> {
+pub fn derive_key(password: &String, salt: &Salt) -> Result<SymmetricKey, String> {
     let mut key: [u8; 16] = [0; 16];
     let result = pkcs5::scrypt(password.as_bytes(), salt, 16384, 8, 1, 0, &mut key);
     match result {

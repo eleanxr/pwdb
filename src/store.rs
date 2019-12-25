@@ -1,12 +1,10 @@
 use std::collections::BTreeMap;
 
 use crate::crypto;
+use crypto::{InitializationVector, Salt, SymmetricKey};
 
 use serde::{Deserialize, Serialize};
 
-pub type SymmetricKey = [u8; 16];
-pub type InitializationVector = [u8; 16];
-pub type Salt = [u8; 16];
 type Hash = [u8; 32];
 
 #[derive(Serialize, Deserialize)]
@@ -17,8 +15,8 @@ struct DataBlock {
 }
 
 pub trait DataStore<K, V> {
-    fn add(&mut self, symmetric_key: SymmetricKey, key: &K, value: &V);
-    fn find(&self, symmetric_key: SymmetricKey, key: &K) -> Result<String, String>;
+    fn add(&mut self, passphrase: &String, key: &K, value: &V);
+    fn find(&self, passphrase: &String, key: &K) -> Result<String, String>;
 }
 
 #[derive(Serialize, Deserialize)]
@@ -60,10 +58,10 @@ impl Cryptable for String {
 }
 
 impl<K: Hashable, V: Cryptable> DataStore<K, V> for MapStore {
-    fn add(&mut self, symmetric_key: SymmetricKey, key: &K, value: &V) {
+    fn add(&mut self, passphrase: &String, key: &K, value: &V) {
         let iv = crypto::initialization_vector();
-        let mut salt: Salt = [0; 16];
-        openssl::rand::rand_bytes(&mut salt).expect("Failed to generate salt.");
+        let salt = crypto::salt();
+        let symmetric_key = crypto::derive_key(passphrase, &salt).expect("Failed to derive key.");
         self.map.insert(
             hex::encode(key.hash()),
             DataBlock {
@@ -74,11 +72,14 @@ impl<K: Hashable, V: Cryptable> DataStore<K, V> for MapStore {
         );
     }
 
-    fn find(&self, symmetric_key: SymmetricKey, key: &K) -> Result<String, String> {
+    fn find(&self, passphrase: &String, key: &K) -> Result<String, String> {
         let result = self
             .map
             .get(&hex::encode(key.hash()))
             .map(|block: &DataBlock| {
+                let salt = block.salt;
+                let symmetric_key =
+                    crypto::derive_key(passphrase, &salt).expect("Failed to derive key");
                 Cryptable::decrypt(symmetric_key, block.initialization_vector, &block.data)
             });
         match result {
