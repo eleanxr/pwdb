@@ -4,8 +4,9 @@ mod store;
 
 use std::env;
 use std::fs::File;
-use std::io::{Error, Write};
+use std::io::Write;
 use std::path::Path;
+use std::io;
 
 fn create_or_open_store(path: &Path) -> Result<store::MapStore, String> {
     if path.exists() {
@@ -18,16 +19,30 @@ fn create_or_open_store(path: &Path) -> Result<store::MapStore, String> {
     }
 }
 
+fn prompt_for_passphrase() -> String {
+    print!("Data store passphrase: ");
+    io::stdout().flush().expect("I/O error");
+    let mut passphrase = String::new();
+    io::stdin().read_line(&mut passphrase).expect("Failed to read passphrase.");
+    passphrase
+}
+
 fn add_entry<T: store::DataStore<String, String>>(data_store: &mut T, site: &String) {
+    let passphrase = prompt_for_passphrase();
+    print!("Secret for key {}: ", site);
+    io::stdout().flush().expect("I/O error");
+    let mut secret = String::new();
+    io::stdin().read_line(&mut secret).expect("Failed to read secret.");
     data_store.add(
-        &String::from("fakepassword"),
+        &passphrase,
         &site,
-        &String::from("testpassword"),
+        &secret,
     );
 }
 
 fn get_entry<T: store::DataStore<String, String>>(data_store: &T, site: &String) {
-    match data_store.find(&String::from("fakepassword"), &site) {
+    let passphrase = prompt_for_passphrase();
+    match data_store.find(&passphrase, &site) {
         Ok(data) => println!("{}", data),
         Err(e) => println!("{}", e)
     }

@@ -6,7 +6,6 @@ use openssl::symm::{Cipher, Crypter, Mode};
 pub type SymmetricKey = [u8; 16];
 pub type InitializationVector = [u8; 16];
 pub type Salt = [u8; 16];
-pub type Block = [u8; 16];
 
 pub fn initialization_vector() -> InitializationVector {
     let mut result: InitializationVector = [0; 16];
@@ -59,7 +58,7 @@ pub fn decrypt_string(
 }
 
 pub fn derive_key(password: &String, salt: &Salt) -> Result<SymmetricKey, String> {
-    let mut key: [u8; 16] = [0; 16];
+    let mut key: SymmetricKey = [0; 16];
     let result = pkcs5::scrypt(password.as_bytes(), salt, 16384, 8, 1, 0, &mut key);
     match result {
         Err(stack) => Err(stack.to_string()),
@@ -72,7 +71,7 @@ mod tests {
     use super::*;
     #[test]
     pub fn test_encrypt_string() {
-        let salt: [u8; 16] = [
+        let salt: Salt = [
             0x0, 0x1, 0x2, 0x3, 0x4, 0x5, 0x6, 0x7, 0x8, 0x9, 0xa, 0xb, 0xc, 0xd, 0xe, 0xf,
         ];
         let key1 = derive_key(&String::from("pw1"), &salt);
