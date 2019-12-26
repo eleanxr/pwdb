@@ -30,14 +30,20 @@ fn run_crypter(
     data: &Vec<u8>,
 ) -> Result<Vec<u8>, String> {
     let length = data.len();
-    let mut encrypter = Crypter::new(Cipher::aes_128_cbc(), mode, &key, Some(&iv)).unwrap();
+    let mut encrypter = Crypter::new(Cipher::aes_128_cbc(), mode, &key, Some(&iv))
+        .expect("Failed to create encrypted stream.");
     let block_size = Cipher::aes_128_cbc().block_size();
 
     let mut output = vec![0; length + block_size];
-    let mut count = encrypter.update(&data, &mut output).unwrap();
-    count += encrypter.finalize(&mut output[count..]).unwrap();
-    output.truncate(count);
-    Ok(output)
+    let total_count = encrypter.update(&data, &mut output).and_then(|count| {
+        encrypter
+            .finalize(&mut output[count..])
+            .and_then(|c2| Ok(count + c2))
+    });
+    match total_count {
+        Ok(_) => Ok(output),
+        Err(_) => Err("Encryption/decryption error".to_string()),
+    }
 }
 
 pub fn encrypt_string(
@@ -53,8 +59,9 @@ pub fn decrypt_string(
     iv: InitializationVector,
     data: &Vec<u8>,
 ) -> Result<String, String> {
-    String::from_utf8(run_crypter(key, iv, Mode::Decrypt, &data).unwrap())
-        .map_err(|err| err.to_string())
+    run_crypter(key, iv, Mode::Decrypt, &data)
+        .and_then(|bytes| String::from_utf8(bytes).map_err(|e| e.to_string()))
+        .map_err(|e| e.to_string())
 }
 
 pub fn derive_key(password: &String, salt: &Salt) -> Result<SymmetricKey, String> {
