@@ -38,11 +38,15 @@ fn run_crypter(
     let total_count = encrypter.update(&data, &mut output).and_then(|count| {
         encrypter
             .finalize(&mut output[count..])
-            .and_then(|c2| Ok(count + c2))
+            .and_then(|c2| {
+                let total_length = count + c2;
+                output.truncate(total_length);
+                Ok(total_length)
+            })
     });
     match total_count {
         Ok(_) => Ok(output),
-        Err(_) => Err("Encryption/decryption error".to_string()),
+        Err(e) => Err(e.to_string()),
     }
 }
 
